@@ -1,0 +1,84 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: nginx-conf
+  namespace: default # Or your target namespace
+data:
+  nginx.conf: |
+    worker_processes 1;
+
+    events {
+      worker_connections 1024;
+    }
+
+    http {
+      sendfile on;
+      resolver kube-dns.kube-system.svc.cluster.local valid=5s; # Instructs Nginx to use K8s DNS and re-resolve every 5s
+      # Upstream for the authentication service
+      upstream auth_service_upstream {
+        server auth-service:5000; # Points to the Kubernetes service for auth-service
+      }
+
+      # Upstream for the frontend service
+      upstream frontend_service_upstream {
+        server frontend-service:80; # Points to the Kubernetes service for the frontend
+      }
+
+      # Placeholder upstreams for other services (initially commented out)
+      # upstream booking_service_upstream {
+      #   server booking-service:PORT; # Replace PORT with actual port
+      # }
+      # upstream payment_service_upstream {
+      #   server payment-service:PORT;
+      # }
+      # upstream complaint_service_upstream {
+      #   server complaint-service:PORT;
+      # }
+      # upstream team_service_upstream {
+      #   server team-service:PORT;
+      # }
+      # upstream user_service_upstream {
+      #   server user-service:PORT;
+      # }
+      # upstream tournament_service_upstream {
+      #   server tournament-service:PORT;
+      # }
+      # upstream company_service_upstream {
+      #   server company-service:PORT;
+      # }
+      # upstream court_service_upstream {
+      #   server court-service:PORT;
+      # }
+      # upstream equipment_service_upstream {
+      #   server equipment-service:PORT;
+      # }
+
+      server {
+        listen 80;
+
+        # Default to frontend
+        location / {
+          proxy_pass http://frontend_service_upstream;
+          proxy_set_header Host $host;
+          proxy_set_header X-Real-IP $remote_addr;
+          proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+          proxy_set_header X-Forwarded-Proto $scheme;
+        }
+
+        # Route API calls for auth-service
+        location /api/auth/ {
+          proxy_pass http://auth_service_upstream;
+          proxy_set_header Host $host;
+          proxy_set_header X-Real-IP $remote_addr;
+          proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+          proxy_set_header X-Forwarded-Proto $scheme;
+          # Optional: Rewrite /api/auth/(.*) to /$1 if auth-service expects paths without /api/auth/
+          # rewrite ^/api/auth/(.*)$ /$1 break;
+        }
+
+        # Placeholder locations for other services (initially commented out)
+        # location /api/booking/ { ... }
+        # location /api/payment/ { ... }
+        # ... and so on for other services
+      }
+    }

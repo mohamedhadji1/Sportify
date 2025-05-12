@@ -1,0 +1,30 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: nginx-gateway-deployment
+  namespace: default # Or your target namespace
+  labels:
+    app: nginx-gateway
+spec:
+  replicas: 1 # Adjust as needed
+  selector:
+    matchLabels:
+      app: nginx-gateway
+  template:
+    metadata:
+      labels:
+        app: nginx-gateway
+    spec:
+      containers:
+        - name: nginx-gateway
+          image: nginx:stable-alpine # Using a standard Nginx image
+          ports:
+            - containerPort: 80
+          volumeMounts:
+            - name: nginx-config-volume
+              mountPath: /etc/nginx/nginx.conf # Mount the ConfigMap to the default Nginx config path
+              subPath: nginx.conf # Specify the key from the ConfigMap to mount
+      volumes:
+        - name: nginx-config-volume
+          configMap:
+            name: nginx-conf # Name of the ConfigMap created earlier

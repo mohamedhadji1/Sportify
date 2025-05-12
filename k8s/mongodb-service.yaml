@@ -1,0 +1,14 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: mongodb-service # This is the service name that auth-service will use to connect
+  labels:
+    app: mongodb
+spec:
+  selector:
+    app: mongodb # Selects pods with label app=mongodb (from mongodb-deployment.yaml)
+  ports:
+    - protocol: TCP
+      port: 27017      # Port the service will be available on within the cluster
+      targetPort: 27017 # Port the MongoDB container is listening on
+  type: ClusterIP   # Exposes the service on a cluster-internal IP, suitable for inter-service communication

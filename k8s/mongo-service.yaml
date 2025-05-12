@@ -1,0 +1,15 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: mongodb-service # This is the DNS name that other services will use to connect to MongoDB
+  namespace: default # Or your target namespace
+  labels:
+    app: mongodb
+spec:
+  selector:
+    app: mongodb # This must match the labels of your MongoDB pods
+  ports:
+    - protocol: TCP
+      port: 27017 # Port exposed by the service
+      targetPort: 27017 # Port on the MongoDB pods
+  type: ClusterIP # Exposes the service on a cluster-internal IP. Default type.

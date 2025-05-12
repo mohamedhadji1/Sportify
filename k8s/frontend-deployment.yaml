@@ -1,0 +1,22 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: frontend-deployment
+  namespace: default # Or your target namespace
+  labels:
+    app: frontend
+spec:
+  replicas: 1 # Adjust as needed
+  selector:
+    matchLabels:
+      app: frontend
+  template:
+    metadata:
+      labels:
+        app: frontend
+    spec:
+      containers:
+        - name: frontend
+          image: medhajji1/react-app:latest # Your Docker Hub username and image name
+          ports:
+            - containerPort: 80 # Port exposed by Nginx in your frontend Dockerfile
