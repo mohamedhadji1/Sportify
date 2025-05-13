@@ -3,189 +3,247 @@
 import { useState } from "react"
 import { Button } from "../ui/Button"
 import { TextInput } from "../ui/TextInput"
-import { Card } from "../ui/Card"
 import { Link } from "../ui/Link"
 import { Checkbox } from "../ui/Checkbox"
 import { FileUpload } from "../ui/FileUpload"
-import { ManagerSignIn } from "./ManagerSignIn"
+import { Icons } from "../ui/Icons"
+import { AuthHeader } from "./shared/AuthHeader"
+import { AuthAlert } from "./shared/AuthAlert"
 
-export const ManagerSignUp = () => {
+export const ManagerSignUp = ({ onClose, onSwitchToManagerSignIn }) => {
   const [fullName, setFullName] = useState("")
   const [email, setEmail] = useState("")
   const [cin, setCin] = useState("")
   const [phoneNumber, setPhoneNumber] = useState("")
   const [attachment, setAttachment] = useState(null)
   const [agreeToTerms, setAgreeToTerms] = useState(false)
-  const [showManager, setShowManager] = useState(false)
-  
-  const handleFileChange = (e) => {
-    if (e.target.files && e.target.files[0]) {
-      setAttachment(e.target.files[0])
-    }
-  }
+  const [isLoading, setIsLoading] = useState(false)
+  const [error, setError] = useState("")
+  const [successMessage, setSuccessMessage] = useState("")
 
-  if (showManager) {
-    return <ManagerSignIn />
+  const handleFileChange = (e) => {
+    if (e.target && e.target.files && e.target.files[0]) {
+      setAttachment(e.target.files[0])
+    } else if (e && e.files && e.files[0]) {
+      setAttachment(e.files[0])
+    }
   }
 
   const handleSubmit = async (e) => {
     e.preventDefault()
-    
+    setError("")
+    setSuccessMessage("")
+
     if (!agreeToTerms) {
-      alert("You must agree to the Terms of Service and Privacy Policy")
+      setError("You must agree to the Terms of Service and Privacy Policy.")
       return
     }
 
+    // Basic validation (more can be added)
+    if (!fullName || !email || !cin || !phoneNumber) {
+      setError("All fields except attachment are required.")
+      return
+    }
     if (!attachment) {
-      alert("Please upload the required document")
+      setError("Please upload the required document.")
       return
     }
 
+    // Validate CIN is exactly 8 digits
+    if (!/^\d{8}$/.test(cin)) {
+      setError("CIN must be exactly 8 digits.")
+      return
+    }
+
+    // Validate phone number is exactly 8 digits
+    if (!/^\d{8}$/.test(phoneNumber)) {
+      setError("Phone number must be exactly 8 digits.")
+      return
+    }
+
+    setIsLoading(true)
     const formData = new FormData()
-    formData.append('fullName', fullName)
-    formData.append('email', email)
-    formData.append('cin', cin)
-    formData.append('phoneNumber', phoneNumber)
-    formData.append('attachment', attachment)
+    formData.append("fullName", fullName)
+    formData.append("email", email)
+    formData.append("cin", cin)
+    formData.append("phoneNumber", phoneNumber)
+    formData.append("attachment", attachment)
 
     try {
-      const response = await fetch('/api/auth/manager/signup', {
-        method: 'POST',
+      console.log("Manager signup attempt:", {
+        fullName,
+        email,
+        cin,
+        phoneNumber,
+        attachment: attachment ? attachment.name : null
+      })
+      const response = await fetch("/api/auth/manager/signup", {
+        method: "POST",
         body: formData,
-      });
-      
-      const data = await response.json();
+      })
+
       if (!response.ok) {
-        // Handle errors (e.g., display error message to user)
-        console.error('Manager signup failed:', data);
-        alert(data.msg || (data.errors && data.errors[0].msg) || 'Manager registration failed');
-        return;
+        const data = await response.json()
+        throw new Error(data.msg || (data.errors && data.errors[0].msg) || "Manager registration failed")
       }
-      // Handle successful signup
-      console.log('Manager registration successful:', data);
-      alert('Manager account created successfully! You can now sign in.');
-      setShowManager(true); // Or redirect to login page
+      
+      const data = await response.json()
+      setSuccessMessage("Account created! You can now sign in.")
+      if (onSwitchToManagerSignIn) setTimeout(() => onSwitchToManagerSignIn(), 2000)
     } catch (error) {
-      console.error('Error during manager signup:', error);
-      if (error.message === 'Failed to fetch') {
-        alert('Could not connect to the server. Please check your internet connection and try again.');
-      } else {
-        alert('An error occurred during registration. Please try again.');
-      }
+      console.error("Error during manager signup:", error)
+      setError(error.message || "An error occurred during registration.")
+    } finally {
+      setIsLoading(false)
     }
   }
 
   return (
-    <Card className="w-full max-w-md p-8">
-      <h1 className="text-2xl font-bold mb-2">Create Manager Account</h1>
-      <p className="text-gray-400 mb-6">Register to manage facilities and organize events</p>
+    <>
+      {onClose && (
+        <Button
+          variant="ghost"
+          size="icon"
+          className="absolute top-2 right-2 sm:top-3 sm:right-3 md:top-4 md:right-4 p-0 h-8 w-8 text-muted-foreground hover:text-foreground hover:bg-accent/50 rounded-full z-20 transition-colors"
+          onClick={onClose}
+          aria-label="Close sign up form"
+        >
+          <Icons.Close className="h-5 w-5" />
+        </Button>
+      )}
+      <div className="space-y-5 md:space-y-6">
+        <AuthHeader title="Manager Sign Up" subtitle="Create an account to manage facilities." />
 
-      <form onSubmit={handleSubmit}>
-        <div className="mb-4">
-          <label htmlFor="fullName" className="block mb-2">
-            Full Name
-          </label>
-          <TextInput
-            id="fullName"
-            placeholder="John Smith"
-            value={fullName}
-            onChange={(e) => setFullName(e.target.value)}
-            required
-          />
-        </div>
+        <AuthAlert type="error" message={error} />
+        <AuthAlert type="success" message={successMessage} />
 
-        <div className="mb-4">
-          <label htmlFor="email" className="block mb-2">
-            Email
-          </label>
-          <TextInput
-            id="email"
-            type="email"
-            placeholder="manager@example.com"
-            value={email}
-            onChange={(e) => setEmail(e.target.value)}
-            required
-          />
-        </div>
+        {!successMessage && (
+          <form onSubmit={handleSubmit} className="space-y-5">
+            <TextInput
+              id="fullName-manager"
+              label="Full Name"
+              placeholder="John Doe"
+              value={fullName}
+              onChange={(e) => setFullName(e.target.value)}
+              disabled={isLoading}
+              required
+              icon={<Icons.User className="h-5 w-5" />}
+            />
+            <TextInput
+              id="email-manager-signup"
+              label="Email Address"
+              type="email"
+              placeholder="manager@example.com"
+              value={email}
+              onChange={(e) => setEmail(e.target.value)}
+              disabled={isLoading}
+              required
+              icon={<Icons.Mail className="h-5 w-5" />}
+            />
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-5">
+              <TextInput
+                id="cin-manager"
+                label="CIN (National ID)"
+                placeholder="12345678"
+                type="text"
+                pattern="[0-9]{8}"
+                maxLength={8}
+                value={cin}
+                onChange={(e) => setCin(e.target.value)}
+                disabled={isLoading}
+                required
+                helpText="Must be exactly 8 digits"
+                icon={<Icons.IdCard className="h-5 w-5" />}
+              />
+              <TextInput
+                id="phoneNumber-manager"
+                label="Phone Number"
+                type="tel"
+                placeholder="12345678"
+                pattern="[0-9]{8}"
+                maxLength={8}
+                value={phoneNumber}
+                onChange={(e) => setPhoneNumber(e.target.value)}
+                disabled={isLoading}
+                required
+                helpText="Must be exactly 8 digits"
+                icon={<Icons.Phone className="h-5 w-5" />}
+              />
+            </div>
 
-        <div className="mb-4">
-          <label htmlFor="cin" className="block mb-2">
-            CIN (ID Number)
-          </label>
-          <TextInput id="cin" placeholder="AB123456" value={cin} onChange={(e) => setCin(e.target.value)} required />
-        </div>
+            <div className="space-y-2">
+              <label htmlFor="attachment-manager" className="block text-sm font-medium text-gray-300 mb-1">
+                Identification Document (PDF, JPG, PNG)
+              </label>
+              <div className="bg-[#0a0a1a]/60 border border-[#2a2a40] rounded-lg p-4 hover:border-[#3a3a60] transition-all duration-300">
+                <FileUpload
+                  id="attachment-manager"
+                  label="Attachment (e.g., Business License)"
+                  onChange={handleFileChange}
+                  disabled={isLoading}
+                  accept=".pdf,.jpg,.jpeg,.png"
+                  className="w-full"
+                />
+                {attachment && (
+                  <div className="mt-3 flex items-center text-sm text-gray-400 bg-[#0a0a1a]/80 rounded-md p-2">
+                    <Icons.CheckCircle className="h-4 w-4 text-green-400 mr-2" />
+                    <span>Selected: {attachment.name}</span>
+                  </div>
+                )}
+              </div>
+            </div>
 
-        <div className="mb-4">
-          <label htmlFor="phoneNumber" className="block mb-2">
-            Phone Number
-          </label>
-          <TextInput
-            id="phoneNumber"
-            type="tel"
-            placeholder="+1 (555) 123-4567"
-            value={phoneNumber}
-            onChange={(e) => setPhoneNumber(e.target.value)}
-            required
-          />
-        </div>
-
-        <div className="mb-4">
-          <label htmlFor="attachment" className="block mb-2">
-            Upload Document
-          </label>
-          <FileUpload id="attachment" onChange={handleFileChange} accept=".pdf,.doc,.docx,.jpg,.jpeg,.png" required />
-          <p className="text-xs text-gray-500 mt-1">
-            Please upload a verification document (ID, business license, etc.)
-          </p>
-        </div>
-
-        <div className="mb-6">
-          <Checkbox
-            id="agreeToTerms"
-            checked={agreeToTerms}
-            onChange={(e) => setAgreeToTerms(e.target.checked)}
-            label={
-              <span className="text-sm">
+            <div className="flex items-start space-x-3 pt-2">
+              <Checkbox
+                id="terms-manager"
+                checked={agreeToTerms}
+                onChange={(e) => setAgreeToTerms(e.target.checked)}
+                disabled={isLoading}
+                className="mt-1"
+              />
+              <label htmlFor="terms-manager" className="text-sm text-gray-300 select-none leading-relaxed">
                 I agree to the{" "}
-                <Link href="/terms" size="sm">
+                <Link href="/terms" variant="primary" className="font-medium text-blue-400 hover:text-blue-300">
                   Terms of Service
                 </Link>{" "}
                 and{" "}
-                <Link href="/privacy" size="sm">
+                <Link href="/privacy" variant="primary" className="font-medium text-blue-400 hover:text-blue-300">
                   Privacy Policy
                 </Link>
-              </span>
-            }
-          />
-          <p className="text-xs text-gray-500 mt-1">
-            By checking this box, you agree to our{" "}
-            <Link href="/terms" size="sm">
-              Terms of Service
-            </Link>{" "}
-            and{" "}
-            <Link href="/privacy" size="sm">
-              Privacy Policy
+                .
+              </label>
+            </div>
+
+            <Button
+              type="submit"
+              className="w-full py-3.5 bg-blue-600 hover:bg-blue-700 text-white font-semibold rounded-lg transition-all duration-300 shadow-lg"
+              disabled={isLoading || !agreeToTerms}
+            >
+              {isLoading ? (
+                <>
+                  <Icons.Spinner className="mr-2 h-5 w-5 animate-spin" />
+                  Creating Account...
+                </>
+              ) : (
+                "Create Manager Account"
+              )}
+            </Button>
+          </form>
+        )}
+
+        <div className="text-center pt-2">
+          <p className="text-gray-400 text-sm">
+            Already have an account?{" "}
+            <Link
+              onClick={onSwitchToManagerSignIn}
+              variant="primary"
+              className="font-medium text-blue-400 hover:text-blue-300"
+            >
+              Sign in as Manager
             </Link>
-            .
           </p>
         </div>
-
-        <Button type="submit" variant="primary" className="w-full mb-4">
-          Create Manager Account
-        </Button>
-      </form>
-
-      <div className="text-center mt-4">
-        <p className="text-gray-400">
-          Already have an account?{" "}
-          <button
-          onClick={() => setShowManager(true)}
-          className="text-sm text-blue-500 hover:underline"
-        >
-          Sign in
-        </button>
-        </p>
       </div>
-    </Card>
+    </>
   )
 }

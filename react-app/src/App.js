@@ -1,8 +1,8 @@
-import Navbar from "./components/Navbar";
-import { HeroSection } from "./components/HeroSection"
-import { CategoriesSection } from "./components/CategoriesSection"
-import { FeaturesSection } from "./components/FeaturesSection"
-import { Footer } from "./components/Footer"
+import { HeroSection } from "./components/sections/HeroSection"
+import Navbar from "./components/sections/Navbar"
+import { FeaturesSection } from "./components/sections/FeaturesSection"
+import { Footer } from "./components/sections/Footer"
+import { CategoriesSection } from "./components/sections/CategoriesSection"
 
 function App() {
   return (

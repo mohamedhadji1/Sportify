@@ -1,119 +1,152 @@
+"use client"
+
 import { useState } from "react"
 import { Button } from "../ui/Button"
 import { TextInput } from "../ui/TextInput"
-import { Card } from "../ui/Card"
-import { ManagerSignIn } from "./ManagerSignIn"
-import { PlayerSignUp } from "./PlayerSignUp"
+import { Link } from "../ui/Link"
+import { Icons } from "../ui/Icons"
+import { AuthHeader } from "./shared/AuthHeader"
+import { AuthAlert } from "./shared/AuthAlert"
 
-export const PlayerSignIn = () => {
+export const PlayerSignIn = ({ onClose, onSwitchToManager, onSwitchToPlayerSignUp }) => {
   const [email, setEmail] = useState("")
   const [password, setPassword] = useState("")
-  const [showManager, setShowManager] = useState(false)
-  const [showPlayer, setShowPlayer] = useState(false)
+  const [isLoading, setIsLoading] = useState(false)
+  const [error, setError] = useState("")
 
   const handleSubmit = async (e) => {
     e.preventDefault()
-    
-    // Live validation
+    setIsLoading(true)
+    setError("")
+
     if (!email || !password) {
-      alert("Email and password are required.");
-      return;
+      setError("Email and password are required.")
+      setIsLoading(false)
+      return
     }
 
     try {
-      const response = await fetch('/api/auth/login', {
-        method: 'POST',
+      // Mock API call for demonstration
+      await new Promise((resolve) => setTimeout(resolve, 1000))
+      console.log("Player Sign in attempt:", { email, password })
+      const response = await fetch("/api/auth/login", {
+        method: "POST",
         headers: {
-          'Content-Type': 'application/json',
+          "Content-Type": "application/json",
         },
-        body: JSON.stringify({ email, password }),
-      });
-      
+        body: JSON.stringify({ email, password, role: "player" }),
+      })
+
       if (!response.ok) {
-        throw new Error('Authentication failed');
+        const errorData = await response.json()
+        throw new Error(errorData.msg || "Authentication failed")
       }
-      
-      const data = await response.json();
-      console.log('Sign in successful:', data);
-      // Store token and user role (e.g., in localStorage or context)
-      localStorage.setItem('token', data.token);
-      localStorage.setItem('role', data.role);
-      // Redirect based on role or to a general dashboard
-      alert('Sign in successful! Role: ' + data.role);
-      // Example: window.location.href = '/dashboard'; 
+
+      const data = await response.json()
+      console.log("Sign in successful:", data)
+      localStorage.setItem("token", data.token)
+      localStorage.setItem("role", data.role)
+      if (onClose) onClose() // Close modal on success
     } catch (error) {
-      console.error('Sign in error:', error);
-      const errorMsg = error.response ? await error.response.json() : null;
-      alert(errorMsg?.msg || errorMsg?.errors?.[0]?.msg || 'Sign in failed. Please check your credentials.');
+      console.error("Sign in error:", error)
+      setError(error.message || "Sign in failed. Please check your credentials.")
+    } finally {
+      setIsLoading(false)
     }
   }
 
-  if (showManager) {
-    return <ManagerSignIn />
-  }
-
-  if (showPlayer) {
-    return <PlayerSignUp />
-  }
-
   return (
-    <Card className="w-full max-w-md p-8">
-      <h1 className="text-2xl font-bold mb-2">Player Sign In</h1>
-      <p className="text-gray-400 mb-6">
-        Enter your credentials to access your player account
-      </p>
+    <>
+      {onClose && (
+        <Button
+          variant="ghost"
+          size="icon"
+          className="absolute top-2 right-2 sm:top-3 sm:right-3 md:top-4 md:right-4 p-0 h-8 w-8 text-muted-foreground hover:text-foreground hover:bg-accent/50 rounded-full z-20 transition-colors"
+          onClick={onClose}
+          aria-label="Close sign in form"
+        >
+          <Icons.Close className="h-5 w-5" />
+        </Button>
+      )}
+      <div className="space-y-5 md:space-y-6">
+        <AuthHeader title="Player Sign In" subtitle="Access your player account." />
 
-      <form onSubmit={handleSubmit}>
-        <div className="mb-4">
-          <label htmlFor="email" className="block mb-2">
-            Email
-          </label>
+        <AuthAlert type="error" message={error} />
+
+        <form onSubmit={handleSubmit} className="space-y-5">
           <TextInput
-            id="email"
+            id="email-player"
+            label="Email Address"
             type="email"
-            placeholder="m.johnson@example.com"
+            placeholder="player@example.com"
             value={email}
             onChange={(e) => setEmail(e.target.value)}
+            disabled={isLoading}
             required
+            icon={<Icons.Mail className="h-5 w-5" />}
           />
-        </div>
-
-        <div className="mb-6">
-          <div className="flex justify-between items-center mb-2">
-            <label htmlFor="password">Password</label>
-            {/* This can stay if you want */}
-          </div>
           <TextInput
-            id="password"
+            id="password-player"
+            label="Password"
             type="password"
+            placeholder="••••••••"
             value={password}
             onChange={(e) => setPassword(e.target.value)}
+            disabled={isLoading}
             required
+            icon={<Icons.Lock className="h-5 w-5" />}
           />
+
+          <div className="pt-2">
+            <Button
+              type="submit"
+              className="w-full py-3.5 bg-blue-600 hover:bg-blue-700 text-white font-semibold rounded-lg transition-all duration-300 shadow-lg"
+              disabled={isLoading}
+            >
+              {isLoading ? (
+                <div className="flex items-center justify-center">
+                  <Icons.Spinner className="mr-2 h-5 w-5 animate-spin" />
+                  Signing In...
+                </div>
+              ) : (
+                "Sign In"
+              )}
+            </Button>
+          </div>
+        </form>
+
+        <div className="space-y-3 pt-2">
+          <div className="relative flex items-center justify-center">
+            <div className="absolute inset-0 flex items-center">
+              <div className="w-full border-t border-[#2a2a40]"></div>
+            </div>
+            <div className="relative bg-card px-4 text-xs text-gray-500 uppercase">or</div>
+          </div>
+
+          <div className="text-center space-y-3">
+            <p className="text-gray-400 text-sm">
+              Not a player?{" "}
+              <Link
+                onClick={onSwitchToManager}
+                variant="primary"
+                className="font-medium text-blue-400 hover:text-blue-300"
+              >
+                Sign in as Manager
+              </Link>
+            </p>
+            <p className="text-gray-400 text-sm">
+              Don't have an account?{" "}
+              <Link
+                onClick={onSwitchToPlayerSignUp}
+                variant="primary"
+                className="font-medium text-blue-400 hover:text-blue-300"
+              >
+                Sign up as Player
+              </Link>
+            </p>
+          </div>
         </div>
-
-        <Button type="submit" variant="primary" className="w-full mb-4">
-          Sign In as Player
-        </Button>
-      </form>
-
-      <div className="text-center mt-4">
-        <p className="text-gray-400 mb-2">
-          Don't have a player account?{" "}
-          <button
-            onClick={() => setShowPlayer(true)}
-            className="text-sm text-blue-500 hover:underline"
-          >
-            Sign up
-          </button>
-        </p>
-        <button
-          onClick={() => setShowManager(true)}
-          className="text-sm text-blue-500 hover:underline"
-        >
-          Sign in as Manager instead
-        </button>
       </div>
-    </Card>
+    </>
   )
 }

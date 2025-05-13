@@ -2,14 +2,50 @@
 @tailwind components;
 @tailwind utilities;
 
+:root {
+  --background: 222.2 84% 4.9%; /* hsl(222.2, 84%, 4.9%) approx #0c0a09 */
+  --foreground: 210 40% 98%;   /* hsl(210, 40%, 98%) approx #fafafa */
+
+  --card: 222.2 84% 4.9%;
+  --card-foreground: 210 40% 98%;
+
+  --popover: 222.2 84% 4.9%;
+  --popover-foreground: 210 40% 98%;
+
+  --primary: 210 40% 98%; /* Default primary color (e.g., text) */
+  --primary-foreground: 222.2 47.4% 11.2%; /* Text on primary bg */
+  /* Example for a blue primary button, if needed for Button component variants:
+  --primary: 217.3 93.9% 60.8%; 
+  --primary-foreground: 210 40% 98%; 
+  */
+
+  --secondary: 217.2 32.6% 17.5%; /* approx #20242c */
+  --secondary-foreground: 210 40% 98%;
+
+  --muted: 217.2 32.6% 17.5%;
+  --muted-foreground: 215 20.2% 65.1%; /* approx #94a3b8 */
+
+  --accent: 217.2 32.6% 17.5%;
+  --accent-foreground: 210 40% 98%;
+
+  --destructive: 0 62.8% 30.6%; /* approx #991b1b */
+  --destructive-foreground: 210 40% 98%;
+
+  --border: 217.2 32.6% 17.5%; /* approx #20242c */
+  --input: 217.2 32.6% 17.5%;  /* approx #20242c */
+  --ring: 217.3 93.9% 60.8%; /* approx #3b82f6 (blue, similar to sky-500) */
+
+  --radius: 0.5rem;
+}
+
 body {
   margin: 0;
   font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "Roboto", "Oxygen", "Ubuntu", "Cantarell", "Fira Sans",
     "Droid Sans", "Helvetica Neue", sans-serif;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
-  background-color: #121212;
-  color: white;
+  background-color: hsl(var(--background));
+  color: hsl(var(--foreground));
 }
 /* Custom animation delay classes */
 .animation-delay-1000 {
