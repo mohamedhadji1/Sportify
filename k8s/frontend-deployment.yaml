@@ -17,6 +17,7 @@ spec:
     spec:
       containers:
         - name: frontend
-          image: medhajji1/react-app:latest # Your Docker Hub username and image name
+          image: medhadji/react-app:latest
+          imagePullPolicy: IfNotPresent
           ports:
-            - containerPort: 80 # Port exposed by Nginx in your frontend Dockerfile
+            - containerPort: 80

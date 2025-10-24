@@ -14,42 +14,29 @@ spec:
     metadata:
       labels:
         app: auth-service
+      annotations:
+        rollout-timestamp: "2025-08-26T00:00:00Z"
     spec:
       containers:
         - name: auth-service
-          image: medhajji1/auth-service:latest # Replace with your Docker Hub username/image name if different
+          image: medhadji/auth-service:latest
+          imagePullPolicy: Never
           ports:
             - containerPort: 5000
+          volumeMounts:
+            - name: auth-uploads
+              mountPath: /usr/src/app/uploads
+          envFrom:
+            - secretRef:
+                name: auth-secrets
+            - secretRef:
+                name: mongo-secret
           env:
-            - name: MONGO_URI
-              # The value should be in the format: mongodb://<username>:<password>@<service-name>:<port>/<database-name>?authSource=admin
-              # Using mongodb-service as the hostname, which is the name of the MongoDB Kubernetes service
-              # Using sportify-auth as the database name for this service
-              value: "mongodb://root:password123@mongodb-service:27017/sportify-auth?authSource=admin"
-            - name: MONGO_USERNAME
-              valueFrom:
-                secretKeyRef:
-                  name: mongo-secret
-                  key: mongo-root-username # Using root user for simplicity, consider a dedicated app user
-            - name: MONGO_PASSWORD
-              valueFrom:
-                secretKeyRef:
-                  name: mongo-secret
-                  key: mongo-root-password
-            - name: JWT_SECRET
-              valueFrom:
-                secretKeyRef:
-                  name: auth-secrets # We will create this secret next for JWT and other app-specific secrets
-                  key: jwt-secret
-            - name: GOOGLE_CLIENT_ID
-              valueFrom:
-                secretKeyRef:
-                  name: auth-secrets
-                  key: google-client-id
-            - name: GOOGLE_CLIENT_SECRET
-              valueFrom:
-                secretKeyRef:
-                  name: auth-secrets
-                  key: google-client-secret
             - name: PORT
               value: "5000"
+            - name: COMPANY_SERVICE_URL
+              value: "http://company-service:5001"
+      volumes:
+        - name: auth-uploads
+          persistentVolumeClaim:
+            claimName: auth-service-uploads-pvc

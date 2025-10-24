@@ -1,0 +1,15 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: complaint-service
+  namespace: default
+  labels:
+    app: complaint-service
+spec:
+  selector:
+    app: complaint-service
+  ports:
+    - protocol: TCP
+      port: 5002
+      targetPort: 5002
+  type: ClusterIP

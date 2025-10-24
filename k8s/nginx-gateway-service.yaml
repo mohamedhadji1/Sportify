@@ -9,13 +9,8 @@ spec:
   selector:
     app: nginx-gateway # This must match the labels of your Nginx gateway pods
   ports:
-    - protocol: TCP
-      port: 80 # Port exposed externally
-      targetPort: 80 # Port on the Nginx gateway pods
-  type: LoadBalancer # Use LoadBalancer for cloud environments, or NodePort for local (e.g., Minikube)
-  # For NodePort, you might configure it like this:
-  # type: NodePort
-  # ports:
-  #   - port: 80
-  #     targetPort: 80
-  #     nodePort: 30080 # Example NodePort, choose an available port in the default range (30000-32767)
+  - protocol: TCP
+    port: 80 # Port exposed externally
+    targetPort: 80 # Port on the Nginx gateway pods
+    nodePort: 30081 # NodePort on the host (30000-32767). Use this to reach the gateway from your host.
+  type: NodePort # Expose on each Node's IP at a static port for local clusters

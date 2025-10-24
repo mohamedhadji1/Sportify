@@ -1,0 +1,47 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: booking-service
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: booking-service
+  template:
+    metadata:
+      labels:
+        app: booking-service
+    spec:
+      containers:
+        - name: booking-service
+          image: booking-service:latest
+          imagePullPolicy: Never
+          ports:
+            - containerPort: 5005
+          envFrom:
+            - secretRef:
+                name: booking-secrets
+          env:
+            - name: PORT
+              value: "5005"
+            - name: COURT_SERVICE_URL
+              value: "http://court-service:5003"
+            - name: COMPANY_SERVICE_URL
+              value: "http://company-service:5001"
+            - name: TEAM_SERVICE_URL
+              value: "http://team-service:5004"
+            - name: EMAIL_SERVICE_URL
+              value: "http://complaint-service:5002"
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: booking-service
+spec:
+  selector:
+    app: booking-service
+  ports:
+    - protocol: TCP
+      port: 5005
+      targetPort: 5005
+  type: ClusterIP

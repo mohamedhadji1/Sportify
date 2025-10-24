@@ -1,0 +1,74 @@
+@startuml
+title Authentication System - Use Case Diagram
+
+skinparam dpi 150
+skinparam linetype ortho
+skinparam shadowing false
+skinparam usecase {
+   BackgroundColor<<Primary>> LightBlue
+	BackgroundColor<<Admin>> LightCoral
+	BackgroundColor<<Security>> White
+}
+skinparam actor {
+	BackgroundColor White
+}
+
+left to right direction
+
+' Actors
+actor Player
+actor Manager
+actor Admin
+
+' Main Frames and Sub-Frames
+rectangle "Authentication System" {
+frame "Authentication Use Cases" as AU {
+		usecase PI as "Player Sign In" <<Primary>>
+		usecase PS as "Player Sign Up" <<Primary>>
+		usecase PR as "Password Reset" <<Security>>
+		usecase VE as "Verify Email" <<Security>>
+		usecase TFA as "Two-Factor Verification" <<Security>>
+		usecase SO as "Sign Out"
+	}
+
+	frame "Manager Access" {
+		usecase MI as "Manager Sign In" <<Primary>>
+		usecase MS as "Manager Sign Up" <<Primary>>
+	}
+
+	frame "Administration" {
+		usecase MU as "Manage Users"
+		usecase AC as "Access Admin Console"
+	}
+}
+
+' Actor connections
+Player --> PS
+Player --> PI
+Player --> PR
+Player --> VE
+Player --> TFA
+Player --> SO
+
+Manager --> MI
+Manager --> MS
+Manager --> SO
+Manager --> TFA
+
+Admin --> SO
+Admin --> TFA
+Admin --> MU
+Admin --> AC
+
+' Notes for clarity
+note right of TFA
+  Used by Player, Manager, and Admin
+  during sensitive operations.
+end note
+
+note bottom of AC
+  Restricted to Admin only.
+end note
+
+@enduml
+

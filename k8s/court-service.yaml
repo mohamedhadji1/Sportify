@@ -1,0 +1,15 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: court-service
+  namespace: default
+  labels:
+    app: court-service
+spec:
+  selector:
+    app: court-service
+  ports:
+    - protocol: TCP
+      port: 5003
+      targetPort: 5003
+  type: ClusterIP

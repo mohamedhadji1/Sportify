@@ -1,0 +1,48 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: court-service
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: court-service
+  template:
+    metadata:
+      labels:
+        app: court-service
+    spec:
+      containers:
+        - name: court-service
+          image: medhadji/court-service:latest
+          imagePullPolicy: Never
+          ports:
+            - containerPort: 5003
+          envFrom:
+            - secretRef:
+                name: court-secrets
+          env:
+            - name: PORT
+              value: "5003"
+            - name: COMPANY_SERVICE_URL
+              value: "http://company-service:5001"
+          volumeMounts:
+            - name: court-service-uploads
+              mountPath: /usr/src/app/uploads
+      volumes:
+        - name: court-service-uploads
+          persistentVolumeClaim:
+            claimName: court-service-uploads-pvc
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: court-service
+spec:
+  selector:
+    app: court-service
+  ports:
+    - protocol: TCP
+      port: 5003
+      targetPort: 5003
+  type: ClusterIP

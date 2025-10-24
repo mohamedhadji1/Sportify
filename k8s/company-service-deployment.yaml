@@ -1,0 +1,51 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: company-service
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: company-service
+  template:
+    metadata:
+      labels:
+        app: company-service
+      annotations:
+        rollout-timestamp: "2025-08-26T00:00:00Z"
+    spec:
+      containers:
+        - name: company-service
+          image: medhadji/company-service:latest
+          imagePullPolicy: Never
+          ports:
+            - containerPort: 5001
+          volumeMounts:
+            - name: company-uploads
+              mountPath: /usr/src/app/uploads
+          envFrom:
+            - secretRef:
+                name: company-secrets
+          env:
+            - name: PORT
+              value: "5001"
+      volumes:
+        - name: company-uploads
+          persistentVolumeClaim:
+            claimName: company-service-uploads-pvc
+---
+ 
+apiVersion: v1
+kind: Service
+metadata:
+  name: company-service
+spec:
+  selector:
+    app: company-service
+  ports:
+    - protocol: TCP
+      port: 5001
+      targetPort: 5001
+  type: ClusterIP
+      
+

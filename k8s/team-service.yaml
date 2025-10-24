@@ -1,0 +1,15 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: team-service
+  namespace: default
+  labels:
+    app: team-service
+spec:
+  selector:
+    app: team-service
+  ports:
+    - protocol: TCP
+      port: 5004
+      targetPort: 5004
+  type: ClusterIP

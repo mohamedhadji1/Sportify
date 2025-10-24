@@ -1,0 +1,59 @@
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: api-gateway
+  namespace: default
+spec:
+  ingressClassName: nginx
+  rules:
+    - http:
+        paths:
+          - path: /api/auth
+            pathType: Prefix
+            backend:
+              service:
+                name: auth-service
+                port:
+                  number: 5000
+          - path: /api/company
+            pathType: Prefix
+            backend:
+              service:
+                name: company-service
+                port:
+                  number: 5001
+          - path: /api/courts
+            pathType: Prefix
+            backend:
+              service:
+                name: court-service
+                port:
+                  number: 5003
+          - path: /api/booking
+            pathType: Prefix
+            backend:
+              service:
+                name: booking-service
+                port:
+                  number: 5005
+          - path: /api/teams
+            pathType: Prefix
+            backend:
+              service:
+                name: team-service
+                port:
+                  number: 5002
+          - path: /api/complaints
+            pathType: Prefix
+            backend:
+              service:
+                name: complaint-service
+                port:
+                  number: 5006
+          - path: /api/payments
+            pathType: Prefix
+            backend:
+              service:
+                name: payment-service
+                port:
+                  number: 5010

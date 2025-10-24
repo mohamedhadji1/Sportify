@@ -1,0 +1,45 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: equipment-service
+  labels:
+    app: equipment-service
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: equipment-service
+  template:
+    metadata:
+      labels:
+        app: equipment-service
+    spec:
+      containers:
+        - name: equipment-service
+          image: medhadji/service-equipment:latest
+          imagePullPolicy: IfNotPresent
+          ports:
+            - containerPort: 5020
+          envFrom:
+            - secretRef:
+                name: payment-secrets
+          volumeMounts:
+            - name: uploads-volume
+              mountPath: /app/uploads
+      volumes:
+        - name: uploads-volume
+          persistentVolumeClaim:
+            claimName: equipment-service-uploads-pvc
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: equipment-service
+spec:
+  selector:
+    app: equipment-service
+  ports:
+    - port: 5020
+      targetPort: 5020
+      protocol: TCP
+  type: ClusterIP

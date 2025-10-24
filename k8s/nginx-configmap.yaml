@@ -2,7 +2,7 @@ apiVersion: v1
 kind: ConfigMap
 metadata:
   name: nginx-conf
-  namespace: default # Or your target namespace
+  namespace: default
 data:
   nginx.conf: |
     worker_processes 1;
@@ -13,51 +13,149 @@ data:
 
     http {
       sendfile on;
+      client_max_body_size 10M; # Allow uploads up to 10MB
       resolver kube-dns.kube-system.svc.cluster.local valid=5s; # Instructs Nginx to use K8s DNS and re-resolve every 5s
-      # Upstream for the authentication service
+
+      # Upstreams for all backend services
       upstream auth_service_upstream {
-        server auth-service:5000; # Points to the Kubernetes service for auth-service
+        server auth-service:5000;
       }
-
-      # Upstream for the frontend service
+      upstream booking_service_upstream {
+        server booking-service:5005;
+      }
+      upstream complaint_service_upstream {
+        server complaint-service:5002;
+      }
+      upstream company_service_upstream {
+        server company-service:5001;
+      }
+      upstream court_service_upstream {
+        server court-service:5003;
+      }
+      upstream team_service_upstream {
+        server team-service:5004;
+      }
+      upstream payment_service_upstream {
+        server payment-service:5010;
+      }
+      upstream equipment_service_upstream {
+        server equipment-service:5020;
+      }
+      upstream tournament_service_upstream {
+        server tournament-service:4100;
+      }
       upstream frontend_service_upstream {
-        server frontend-service:80; # Points to the Kubernetes service for the frontend
+        server frontend-service:80;
       }
-
-      # Placeholder upstreams for other services (initially commented out)
-      # upstream booking_service_upstream {
-      #   server booking-service:PORT; # Replace PORT with actual port
-      # }
-      # upstream payment_service_upstream {
-      #   server payment-service:PORT;
-      # }
-      # upstream complaint_service_upstream {
-      #   server complaint-service:PORT;
-      # }
-      # upstream team_service_upstream {
-      #   server team-service:PORT;
-      # }
-      # upstream user_service_upstream {
-      #   server user-service:PORT;
-      # }
-      # upstream tournament_service_upstream {
-      #   server tournament-service:PORT;
-      # }
-      # upstream company_service_upstream {
-      #   server company-service:PORT;
-      # }
-      # upstream court_service_upstream {
-      #   server court-service:PORT;
-      # }
-      # upstream equipment_service_upstream {
-      #   server equipment-service:PORT;
-      # }
 
       server {
         listen 80;
 
-        # Default to frontend
-        location / {
+        # Serve static asset requests directly (do not rewrite these)
+        location /static/ {
+          proxy_pass http://frontend_service_upstream;
+          proxy_set_header Host $host;
+          proxy_set_header X-Real-IP $remote_addr;
+          proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+          proxy_set_header X-Forwarded-Proto $scheme;
+        }
+        location /assets/ {
+          proxy_pass http://frontend_service_upstream;
+          proxy_set_header Host $host;
+          proxy_set_header X-Real-IP $remote_addr;
+          proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+          proxy_set_header X-Forwarded-Proto $scheme;
+        }
+        # Serve uploaded files from backend via gateway
+        # Company uploads (logos) should be served by the company service.
+        # Specific rule for company uploads must come before the generic /uploads/ rule.
+        location /uploads/company- {
+          proxy_pass http://company_service_upstream;
+          proxy_set_header Host $host;
+          proxy_set_header X-Real-IP $remote_addr;
+          proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+          proxy_set_header X-Forwarded-Proto $scheme;
+        }
+        
+        # Handle the specific problematic image directly
+        location = /uploads/68d86e1b04baa0904a2d12ec-1759014427709-468884599.png {
+          proxy_pass http://equipment_service_upstream/uploads/68d86e1b04baa0904a2d12ec-1759014427709-468884599.png;
+          proxy_set_header Host $host;
+          proxy_set_header X-Real-IP $remote_addr;
+          proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+          proxy_set_header X-Forwarded-Proto $scheme;
+          add_header X-Debug-Info "Specific equipment image handler" always;
+        }
+        
+        # Equipment uploads handling based on filename pattern (equipment IDs are MongoDB ObjectIDs)
+        location ~ "^/uploads/([0-9a-f]+)-([0-9]+-[0-9]+.*)$" {
+          # This routes equipment image paths to the equipment service
+          proxy_pass http://equipment_service_upstream/uploads/$1-$2$is_args$args;
+          proxy_set_header Host $host;
+          proxy_set_header X-Real-IP $remote_addr;
+          proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+          proxy_set_header X-Forwarded-Proto $scheme;
+          add_header X-Debug-Info "Pattern-matched equipment image" always;
+        }
+        
+        # General equipment uploads path
+        location /uploads/equipment/ {
+          proxy_pass http://equipment_service_upstream/uploads/;
+          proxy_set_header Host $host;
+          proxy_set_header X-Real-IP $remote_addr;
+          proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+          proxy_set_header X-Forwarded-Proto $scheme;
+        }
+
+        # Normalize accidental duplicate '/uploads/uploads/...' requests to single '/uploads/'
+        # This makes the gateway tolerant of frontend bundles that accidentally prefix uploads twice.
+        location ~ "^/uploads/uploads/(.*)$" {
+          # Internally rewrite duplicated '/uploads/uploads/...' to '/uploads/...' so
+          # the gateway serves the file without issuing a client-side redirect.
+          rewrite ^/uploads/uploads/(.*)$ /uploads/$1 last;
+        }
+
+        # Serve court uploads directly when requested at /uploads/courts/
+        location /uploads/courts/ {
+          proxy_pass http://court_service_upstream/uploads/courts/;
+          proxy_set_header Host $host;
+          proxy_set_header X-Real-IP $remote_addr;
+          proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+          proxy_set_header X-Forwarded-Proto $scheme;
+        }
+
+        # Pattern for equipment images with MongoDB ObjectIDs (catch-all for these specific patterns)
+        # Format: 24 hex chars - number - number.extension
+        location ~ "^/uploads/([0-9a-f]{24})-([0-9]+)-([0-9]+\\.[a-zA-Z0-9]+)$" {
+          proxy_pass http://equipment_service_upstream/uploads/$1-$2-$3;
+          proxy_set_header Host $host;
+          proxy_set_header X-Real-IP $remote_addr;
+          proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+          proxy_set_header X-Forwarded-Proto $scheme;
+          add_header X-Debug-Info "MongoDB ObjectID pattern match" always;
+        }
+
+        location /uploads/ {
+          # Default to auth service for generic uploads
+          proxy_pass http://auth_service_upstream;
+          proxy_set_header Host $host;
+          proxy_set_header X-Real-IP $remote_addr;
+          proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+          proxy_set_header X-Forwarded-Proto $scheme;
+        }
+        location = /favicon.ico {
+          proxy_pass http://frontend_service_upstream;
+        }
+        location = /manifest.json {
+          proxy_pass http://frontend_service_upstream;
+        }
+
+        # Proxy asset and api requests directly to frontend or backends above.
+        # For other paths (client-side routes), serve frontend's index.html so the
+        # client-side router can handle the route.
+        location ~* "^/(?!static/|assets/|api/|uploads/|favicon\\.ico|manifest\\.json).*$" {
+          # Rewrite client-side routes to /index.html then proxy to frontend
+          rewrite ^ /index.html break;
           proxy_pass http://frontend_service_upstream;
           proxy_set_header Host $host;
           proxy_set_header X-Real-IP $remote_addr;
@@ -65,20 +163,298 @@ data:
           proxy_set_header X-Forwarded-Proto $scheme;
         }
 
-        # Route API calls for auth-service
+        # Route API calls for each backend service
+        # Serve uploaded files routed via the auth API path by rewriting to /uploads
+        # Also accept accidental filesystem-prefixed paths such as
+        # /api/auth/usr/src/app/uploads/<file> and proxy them to the auth uploads
+        # This makes the gateway tolerant of frontend bundles that saved absolute
+        # server paths into the DB and then request them via the API prefix.
+        location ~ "^/api/auth/(?:.*?/)?uploads/(.*)$" {
+          # Capture the filename and proxy to the auth service uploads handler
+          proxy_pass http://auth_service_upstream/uploads/$1;
+          proxy_set_header Host $host;
+          proxy_set_header X-Real-IP $remote_addr;
+          proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+          proxy_set_header X-Forwarded-Proto $scheme;
+        }
+        location /uploads/teams/ {
+          # Capture the filename and proxy to the team service uploads handler
+          proxy_pass http://team_service_upstream/uploads/teams/;
+          proxy_set_header Host $host;
+          proxy_set_header X-Real-IP $remote_addr;
+          proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+          proxy_set_header X-Forwarded-Proto $scheme;
+        }
+
+        location /api/auth/uploads/ {
+          proxy_pass http://auth_service_upstream/uploads/;
+          proxy_set_header Host $host;
+          proxy_set_header X-Real-IP $remote_addr;
+          proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+          proxy_set_header X-Forwarded-Proto $scheme;
+        }
+
+        # Serve court uploads via gateway at /api/uploads/courts/
+        location /api/uploads/courts/ {
+          # preserve the 'courts' path segment so backend receives /uploads/courts/<file>
+          proxy_pass http://court_service_upstream/uploads/courts/;
+          proxy_set_header Host $host;
+          proxy_set_header X-Real-IP $remote_addr;
+          proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+          proxy_set_header X-Forwarded-Proto $scheme;
+        }
+
         location /api/auth/ {
           proxy_pass http://auth_service_upstream;
           proxy_set_header Host $host;
           proxy_set_header X-Real-IP $remote_addr;
           proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
           proxy_set_header X-Forwarded-Proto $scheme;
-          # Optional: Rewrite /api/auth/(.*) to /$1 if auth-service expects paths without /api/auth/
-          # rewrite ^/api/auth/(.*)$ /$1 break;
         }
 
-        # Placeholder locations for other services (initially commented out)
-        # location /api/booking/ { ... }
-        # location /api/payment/ { ... }
-        # ... and so on for other services
+        # Notifications endpoint (served by booking service)
+        location = /api/notifications {
+          proxy_pass http://booking_service_upstream;
+          proxy_set_header Host $host;
+          proxy_set_header X-Real-IP $remote_addr;
+          proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+          proxy_set_header X-Forwarded-Proto $scheme;
+        }
+        location /api/notifications/ {
+          proxy_pass http://booking_service_upstream;
+          proxy_set_header Host $host;
+          proxy_set_header X-Real-IP $remote_addr;
+          proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+          proxy_set_header X-Forwarded-Proto $scheme;
+        }
+
+        # Booking service routes (support plural and calendar endpoints)
+        location /api/booking/ {
+          proxy_pass http://booking_service_upstream;
+          proxy_set_header Host $host;
+          proxy_set_header X-Real-IP $remote_addr;
+          proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+          proxy_set_header X-Forwarded-Proto $scheme;
+        }
+        location /api/bookings/ {
+          proxy_pass http://booking_service_upstream;
+          proxy_set_header Host $host;
+          proxy_set_header X-Real-IP $remote_addr;
+          proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+          proxy_set_header X-Forwarded-Proto $scheme;
+        }
+        location = /api/bookings {
+          proxy_pass http://booking_service_upstream;
+          proxy_set_header Host $host;
+          proxy_set_header X-Real-IP $remote_addr;
+          proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+          proxy_set_header X-Forwarded-Proto $scheme;
+        }
+        location /api/calendar/ {
+          proxy_pass http://booking_service_upstream;
+          proxy_set_header Host $host;
+          proxy_set_header X-Real-IP $remote_addr;
+          proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+          proxy_set_header X-Forwarded-Proto $scheme;
+        }
+        # Team bookings endpoints (plural and singular)
+        location /api/team-bookings/ {
+          proxy_pass http://booking_service_upstream;
+          proxy_set_header Host $host;
+          proxy_set_header X-Real-IP $remote_addr;
+          proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+          proxy_set_header X-Forwarded-Proto $scheme;
+        }
+        location /api/team-bookings {
+          proxy_pass http://booking_service_upstream;
+          proxy_set_header Host $host;
+          proxy_set_header X-Real-IP $remote_addr;
+          proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+          proxy_set_header X-Forwarded-Proto $scheme;
+        }
+        # Payment service routes (Stripe checkout/session endpoints)
+        location /api/payments/ {
+          proxy_pass http://payment_service_upstream;
+          proxy_set_header Host $host;
+          proxy_set_header X-Real-IP $remote_addr;
+          proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+          proxy_set_header X-Forwarded-Proto $scheme;
+        }
+        location /api/payments {
+          proxy_pass http://payment_service_upstream;
+          proxy_set_header Host $host;
+          proxy_set_header X-Real-IP $remote_addr;
+          proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+          proxy_set_header X-Forwarded-Proto $scheme;
+        }
+        # Equipment service routes
+        location /api/equipment/ {
+          proxy_pass http://equipment_service_upstream;
+          proxy_set_header Host $host;
+          proxy_set_header X-Real-IP $remote_addr;
+          proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+          proxy_set_header X-Forwarded-Proto $scheme;
+        }
+        location /api/equipment {
+          proxy_pass http://equipment_service_upstream;
+          proxy_set_header Host $host;
+          proxy_set_header X-Real-IP $remote_addr;
+          proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+          proxy_set_header X-Forwarded-Proto $scheme;
+        }
+        
+        # Equipment uploads handling
+        location /api/equipment/uploads/ {
+          proxy_pass http://equipment_service_upstream/uploads/;
+          proxy_set_header Host $host;
+          proxy_set_header X-Real-IP $remote_addr;
+          proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+          proxy_set_header X-Forwarded-Proto $scheme;
+        }
+        location = /api/calendar {
+          proxy_pass http://booking_service_upstream;
+          proxy_set_header Host $host;
+          proxy_set_header X-Real-IP $remote_addr;
+          proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+          proxy_set_header X-Forwarded-Proto $scheme;
+        }
+        location /api/complaint/ {
+          proxy_pass http://complaint_service_upstream;
+          proxy_set_header Host $host;
+          proxy_set_header X-Real-IP $remote_addr;
+          proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+          proxy_set_header X-Forwarded-Proto $scheme;
+        }
+        location /api/company/ {
+          proxy_pass http://company_service_upstream;
+          proxy_set_header Host $host;
+          proxy_set_header X-Real-IP $remote_addr;
+          proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+          proxy_set_header X-Forwarded-Proto $scheme;
+        }
+        # Court service (plural path expected by frontend)
+        # Support requests both with and without trailing slash to avoid nginx auto-redirects
+        location = /api/courts {
+          proxy_pass http://court_service_upstream;
+          proxy_set_header Host $host;
+          proxy_set_header X-Real-IP $remote_addr;
+          proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+          proxy_set_header X-Forwarded-Proto $scheme;
+          proxy_set_header X-Forwarded-Host $host;
+          proxy_set_header X-Forwarded-Port $server_port;
+          proxy_redirect ~^https?://localhost(:\d+)?(.*)$ $2;
+        }
+        location /api/courts/ {
+          proxy_pass http://court_service_upstream;
+          proxy_set_header Host $host;
+          proxy_set_header X-Real-IP $remote_addr;
+          proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+          proxy_set_header X-Forwarded-Proto $scheme;
+          proxy_set_header X-Forwarded-Host $host;
+          proxy_set_header X-Forwarded-Port $server_port;
+          # Rewrite absolute redirects from backends that use http://localhost[:port]/... to relative paths
+          # This regex strips protocol, host and optional port, leaving only the path.
+          proxy_redirect ~^https?://localhost(:\d+)?(.*)$ $2;
+        }
+        # Support plural route used by frontend
+        location /api/companies/ {
+          proxy_pass http://company_service_upstream;
+          proxy_set_header Host $host;
+          proxy_set_header X-Real-IP $remote_addr;
+          proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+          proxy_set_header X-Forwarded-Proto $scheme;
+        }
+        location /api/companies {
+          proxy_pass http://company_service_upstream;
+          proxy_set_header Host $host;
+          proxy_set_header X-Real-IP $remote_addr;
+          proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+          proxy_set_header X-Forwarded-Proto $scheme;
+        }
+        location /api/court/ {
+          proxy_pass http://court_service_upstream;
+          proxy_set_header Host $host;
+          proxy_set_header X-Real-IP $remote_addr;
+          proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+          proxy_set_header X-Forwarded-Proto $scheme;
+        }
+        location /api/team/ {
+          proxy_pass http://team_service_upstream;
+          proxy_set_header Host $host;
+          proxy_set_header X-Real-IP $remote_addr;
+          proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+          proxy_set_header X-Forwarded-Proto $scheme;
+        }
+        # Support plural teams route
+        location /api/teams/ {
+          proxy_pass http://team_service_upstream;
+          proxy_set_header Host $host;
+          proxy_set_header X-Real-IP $remote_addr;
+          proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+          proxy_set_header X-Forwarded-Proto $scheme;
+        }
+        location /api/teams {
+          proxy_pass http://team_service_upstream;
+          proxy_set_header Host $host;
+          proxy_set_header X-Real-IP $remote_addr;
+          proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+          proxy_set_header X-Forwarded-Proto $scheme;
+        }
+
+        # Tournament service routes
+        location /api/tournaments/ {
+          proxy_pass http://tournament_service_upstream;
+          proxy_set_header Host $host;
+          proxy_set_header X-Real-IP $remote_addr;
+          proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+          proxy_set_header X-Forwarded-Proto $scheme;
+        }
+        location /api/tournaments {
+          proxy_pass http://tournament_service_upstream;
+          proxy_set_header Host $host;
+          proxy_set_header X-Real-IP $remote_addr;
+          proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+          proxy_set_header X-Forwarded-Proto $scheme;
+        }
+        location /api/match-events/ {
+          proxy_pass http://tournament_service_upstream;
+          proxy_set_header Host $host;
+          proxy_set_header X-Real-IP $remote_addr;
+          proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+          proxy_set_header X-Forwarded-Proto $scheme;
+        }
+        location /api/match-events {
+          proxy_pass http://tournament_service_upstream;
+          proxy_set_header Host $host;
+          proxy_set_header X-Real-IP $remote_addr;
+          proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+          proxy_set_header X-Forwarded-Proto $scheme;
+        }
+
+        # Verification endpoints used during signup/2FA, route to auth service
+        location /api/verification/ {
+          proxy_pass http://auth_service_upstream;
+          proxy_set_header Host $host;
+          proxy_set_header X-Real-IP $remote_addr;
+          proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+          proxy_set_header X-Forwarded-Proto $scheme;
+        }
+        location /api/verification {
+          proxy_pass http://auth_service_upstream;
+          proxy_set_header Host $host;
+          proxy_set_header X-Real-IP $remote_addr;
+          proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+          proxy_set_header X-Forwarded-Proto $scheme;
+        }
+
+        # Handle WebSocket connections if any app uses them (e.g., for Socket.IO)
+        # This might need to be adjusted based on which service handles WebSockets  
+        # location /socket.io/ {
+        #   proxy_pass http://auth_service_upstream; # Example: if auth service handles it
+        #   proxy_http_version 1.1;
+        #   proxy_set_header Upgrade $http_upgrade;
+        #   proxy_set_header Connection "Upgrade";
+        #   proxy_set_header Host $host;
+        # }
       }
     }
